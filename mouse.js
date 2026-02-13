@@ -1,5 +1,5 @@
-// script.js
-// Interactive ocean ripples (separate JS file)
+// mouse.js
+// Interactive ocean ripples (mobile optimized)
 
 document.addEventListener('DOMContentLoaded', () => {
   const oceanBox = document.getElementById('ocean-box');
@@ -8,56 +8,67 @@ document.addEventListener('DOMContentLoaded', () => {
   oceanBox.appendChild(canvas);
   const ctx = canvas.getContext('2d');
 
-  // handle high-DPI displays
+  let ripples = [];
+  let lastRippleTime = 0;
+
+  // -----------------------------
+  // Resize (optimized for mobile)
+  // -----------------------------
   function resizeCanvas() {
     const rect = oceanBox.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
+
+    // cap DPR for performance
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
     canvas.style.width = rect.width + 'px';
     canvas.style.height = rect.height + 'px';
+
     canvas.width = Math.round(rect.width * dpr);
     canvas.height = Math.round(rect.height * dpr);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // scale drawing operations
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
-  // initial resize
   resizeCanvas();
   window.addEventListener('resize', resizeCanvas);
 
-  // ripple store
-  let ripples = [];
-
+  // -----------------------------
+  // Ripple creation (throttled)
+  // -----------------------------
   function addRipple(x, y) {
-    // Convert client coords to canvas local coords
+    const now = performance.now();
+
+    // limit ripple frequency (big mobile boost)
+    if (now - lastRippleTime < 30) return;
+    lastRippleTime = now;
+
     const rect = canvas.getBoundingClientRect();
-    const localX = x - rect.left;
-    const localY = y - rect.top;
-    ripples.push({ x: localX, y: localY, t: 0 });
+
+    ripples.push({
+      x: x - rect.left,
+      y: y - rect.top,
+      t: 0
+    });
   }
 
-  // Mouse events
-  oceanBox.addEventListener('mousemove', (e) => {
+  // -----------------------------
+  // Pointer events (mouse + touch)
+  // -----------------------------
+  oceanBox.addEventListener('pointerdown', (e) => {
     addRipple(e.clientX, e.clientY);
   });
 
-  // Touch events (prevent default on touchmove so page doesn't scroll)
-  oceanBox.addEventListener('touchmove', (e) => {
-    // only handle first touch for simplicity
-    const t = e.touches[0];
-    if (t) addRipple(t.clientX, t.clientY);
-    // prevent scrolling while touching the canvas
-    e.preventDefault();
-  }, { passive: false });
+  oceanBox.addEventListener('pointermove', (e) => {
+    if (e.pointerType === 'mouse' || e.pointerType === 'touch') {
+      addRipple(e.clientX, e.clientY);
+    }
+  });
 
-  // Optional: pointer events unify mouse & touch (uncomment to use pointer API)
-  // oceanBox.addEventListener('pointermove', (e) => {
-  //   if (e.pointerType === 'touch' || e.pointerType === 'mouse') {
-  //     addRipple(e.clientX, e.clientY);
-  //   }
-  // });
-
-  // animation
+  // -----------------------------
+  // Animation loop
+  // -----------------------------
   function draw() {
-    // clear & background
+    // clear background
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -65,12 +76,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // draw ripples
     for (let i = 0; i < ripples.length; i++) {
       const r = ripples[i];
+
       const alpha = Math.max(0, 1 - r.t / 60);
+
       ctx.beginPath();
       ctx.strokeStyle = `rgba(0,191,255,${alpha})`;
       ctx.lineWidth = 2;
       ctx.arc(r.x, r.y, r.t * 2, 0, Math.PI * 2);
       ctx.stroke();
+
       r.t++;
     }
 
